@@ -1,0 +1,12 @@
+{
+  "domain": "eon_smart_charging",
+  "name": "E.ON Smart Charging",
+  "version": "1.0.0",
+  "documentation": "https://github.com/marcohald/ha-eon-smart-charging",
+  "issue_tracker": "https://github.com/marcohald/ha-eon-smart-charging/issues",
+  "dependencies": [],
+  "codeowners": ["@marcohald"],
+  "requirements": ["aiohttp>=3.8.0"],
+  "config_flow": true,
+  "iot_class": "cloud_polling"
+}

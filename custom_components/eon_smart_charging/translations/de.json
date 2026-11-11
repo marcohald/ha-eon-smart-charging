@@ -1,0 +1,29 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "E.ON Login via meineonandroid-URL",
+        "description": "1. Öffne den folgenden Anmelde-Link im Browser:\n\n[**Hier klicken: Bei E.ON anmelden**]({auth_url})\n\n2. Melde dich mit deinen E.ON Zugangsdaten an.\n\n3. Nach dem Login leitet der Browser auf eine Adresse weiter, die mit `meineonandroid://` beginnt.\n\n4. Kopiere diese vollständige URL (oder den Link aus der Adresszeile) und füge sie unten ein:",
+        "data": {
+          "callback_url": "Kopierte meineonandroid://... URL"
+        }
+      },
+      "select_device": {
+        "title": "Gerät oder Elektroauto auswählen",
+        "description": "Wähle das zu steuernde Fahrzeug oder die Wallbox aus:",
+        "data": {
+          "config_id": "Fahrzeug / Wallbox"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zur E.ON HEMS API fehlgeschlagen.",
+      "invalid_auth": "Ungültiger Code oder URL abgewiesen. Bitte wiederhole den Login-Schritt.",
+      "missing_callback": "Bitte füge die kopierte meineonandroid://... URL ein.",
+      "no_devices_found": "Keine verknüpften Elektrofahrzeuge oder Wallboxen im E.ON Konto gefunden."
+    },
+    "abort": {
+      "already_configured": "Dieses Fahrzeug / diese Wallbox ist bereits eingerichtet."
+    }
+  }
+}
