@@ -91,11 +91,12 @@ class EonSmartChargingApiClient:
 
     async def async_exchange_oauth_code(self, code: str, code_verifier: str) -> dict[str, Any]:
         """Exchange authorization code (from meineonandroid:// callback) for tokens."""
+        clean_code = urllib.parse.unquote(code.strip())
         data = {
             "grant_type": "authorization_code",
             "client_id": OAUTH_CLIENT_ID,
             "redirect_uri": OAUTH_REDIRECT_URI,
-            "code": code,
+            "code": clean_code,
             "code_verifier": code_verifier,
         }
         headers = {
@@ -174,14 +175,17 @@ class EonSmartChargingApiClient:
         if not self._hems_token or (self._b2c_token and time.time() >= self._token_expires_at):
             if self._refresh_token:
                 await self.async_refresh_tokens()
-            else:
+            elif self._b2c_token:
                 await self.async_exchange_hems_token()
+
+        if not self._hems_token:
+            raise EonAuthError("No valid HEMS token available")
 
         return {
             "Authorization": f"Bearer {self._hems_token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "HomeAssistant-EonSmartCharging/1.0.0",
+            "User-Agent": "HomeAssistant-EonSmartCharging/1.0.1",
         }
 
     async def async_request(self, method: str, path: str, json: dict[str, Any] | None = None) -> Any:
@@ -195,7 +199,7 @@ class EonSmartChargingApiClient:
                     _LOGGER.info("Received 401 Unauthorized, refreshing HEMS token...")
                     if self._refresh_token:
                         await self.async_refresh_tokens()
-                    else:
+                    elif self._b2c_token:
                         await self.async_exchange_hems_token()
                     headers = await self._get_auth_headers()
                     async with self._session.request(method, url, json=json, headers=headers) as retry_resp:
@@ -204,7 +208,10 @@ class EonSmartChargingApiClient:
                             raise EonApiError(f"API call {method} {path} failed ({retry_resp.status}): {text}")
                         if retry_resp.status == 204:
                             return None
-                        return await retry_resp.json()
+                        try:
+                            return await retry_resp.json()
+                        except Exception:
+                            return await retry_resp.text()
 
                 if resp.status not in (200, 201, 204):
                     text = await resp.text()
@@ -212,7 +219,10 @@ class EonSmartChargingApiClient:
 
                 if resp.status == 204:
                     return None
-                return await resp.json()
+                try:
+                    return await resp.json()
+                except Exception:
+                    return await resp.text()
         except aiohttp.ClientError as err:
             raise EonApiError(f"Network error during call to {path}: {err}") from err
 

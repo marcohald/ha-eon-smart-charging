@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
@@ -78,8 +79,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
+    if unload_ok and DOMAIN in hass.data:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
     return unload_ok
 
 
@@ -123,13 +124,13 @@ class EonEntity(CoordinatorEntity[EonDataUpdateCoordinator]):
         self._attr_unique_id = f"{entry.data[CONF_CONFIG_ID]}_{key}"
 
     @property
-    def device_info(self) -> dict:
+    def device_info(self) -> DeviceInfo:
         """Return information about the device."""
         device_name = self.entry.data.get(CONF_DEVICE_NAME, "E.ON Smart Charging")
         config_id = self.entry.data[CONF_CONFIG_ID]
-        return {
-            "identifiers": {(DOMAIN, config_id)},
-            "name": device_name,
-            "manufacturer": "E.ON",
-            "model": "HEMS Smart Charging (" + self.coordinator.device_type + ")",
-        }
+        return DeviceInfo(
+            identifiers={(DOMAIN, config_id)},
+            name=device_name,
+            manufacturer="E.ON",
+            model=f"HEMS Smart Charging ({self.coordinator.device_type})",
+        )

@@ -8,7 +8,7 @@ import urllib.parse
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import (
@@ -35,23 +35,35 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def extract_code_from_callback(callback_str: str) -> str | None:
-    """Extract code from meineonandroid:// URL or query string."""
+    """Extract code or token from meineonandroid:// URL, query string or raw string."""
     clean = callback_str.strip()
     if not clean:
         return None
 
-    # If it is a full URL or contains query parameters
-    if "?" in clean:
-        parsed = urllib.parse.urlparse(clean)
+    parsed = urllib.parse.urlparse(clean)
+    if parsed.query:
         query = urllib.parse.parse_qs(parsed.query)
         if "code" in query and query["code"]:
-            return query["code"][0]
+            return urllib.parse.unquote(query["code"][0])
+        if "id_token" in query and query["id_token"]:
+            return query["id_token"][0]
+        if "access_token" in query and query["access_token"]:
+            return query["access_token"][0]
 
-    # In case user pasted something like 'code=XYZ'
-    if clean.startswith("code="):
-        return clean.split("code=", 1)[1].split("&")[0]
+    if parsed.fragment:
+        frag_query = urllib.parse.parse_qs(parsed.fragment)
+        if "code" in frag_query and frag_query["code"]:
+            return urllib.parse.unquote(frag_query["code"][0])
+        if "id_token" in frag_query and frag_query["id_token"]:
+            return frag_query["id_token"][0]
+        if "access_token" in frag_query and frag_query["access_token"]:
+            return frag_query["access_token"][0]
 
-    # If user pasted raw code or raw token
+    if "code=" in clean:
+        part = clean.split("code=", 1)[1]
+        code_val = part.split("&")[0].split("#")[0]
+        return urllib.parse.unquote(code_val)
+
     return clean
 
 
@@ -70,7 +82,7 @@ class EonSmartChargingConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._client: EonSmartChargingApiClient | None = None
         self._devices: list[dict[str, Any]] = []
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Step 1: Open E.ON login and paste meineonandroid:// URL."""
         errors: dict[str, str] = {}
 
@@ -95,7 +107,8 @@ class EonSmartChargingConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     # Check if it looks like an OAuth code or a raw JWT token
                     if code_or_token.startswith("ey"):  # Raw JWT token
                         self._b2c_token = code_or_token
-                        await self._client.async_exchange_hems_token()
+                        self._client._b2c_token = code_or_token
+                        self._hems_token = await self._client.async_exchange_hems_token()
                     else:
                         # Exchange authorization code using stored PKCE code_verifier
                         tokens = await self._client.async_exchange_oauth_code(
@@ -155,7 +168,7 @@ class EonSmartChargingConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_select_device(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_select_device(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Step 2: Choose which car or wallbox to control."""
         if user_input is not None:
             selected_id = user_input[CONF_CONFIG_ID]
